@@ -38,7 +38,7 @@ license = {file = "LICENSE"}
 Homepage = "https://github.com/arnavdas88/nats-observatory"
 Repository = "https://github.com/arnavdas88/nats-observatory"
 Changelog = "https://github.com/arnavdas88/nats-observatory/blob/main/CHANGELOG.md"
-# Documentation = "https://my-package.readthedocs.io/"
+# Documentation = "https://nats-observatory.readthedocs.io/"
 
 [project.optional-dependencies]
 dev = [

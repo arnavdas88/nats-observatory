@@ -1,4 +1,4 @@
-# python-package-template
+# nats-observatory
 
 This is a template repository for Python package projects.
 
@@ -32,7 +32,7 @@ This template repository comes with all of the boilerplate needed for:
 
 ### Initial setup
 
-1. [Create a new repository](https://github.com/allenai/python-package-template/generate) from this template with the desired name of your project.
+1. [Create a new repository](https://github.com/arnavdas88/nats-observatory/generate) from this template with the desired name of your project.
 
     *Your project name (i.e. the name of the repository) and the name of the corresponding Python package don't necessarily need to match, but you might want to check on [PyPI](https://pypi.org/) first to see if the package name you want is already taken.*
 
@@ -47,8 +47,8 @@ This template repository comes with all of the boilerplate needed for:
     *Then you can create and activate a new Python environment by running:*
 
     ```
-    conda create -n my-package python=3.9
-    conda activate my-package
+    conda create -n nats-observatory python=3.9
+    conda activate nats-observatory
     ```
 
 3. Now that you have a suitable Python environment, you're ready to personalize this repository. Just run:
@@ -105,9 +105,9 @@ Here is an incomplete list of some projects that started off with this template:
 
 #### Should I use this template even if I don't want to publish my package?
 
-Absolutely! If you don't want to publish your package, just delete the `docs/` directory and the `release` job in [`.github/workflows/main.yml`](https://github.com/allenai/python-package-template/blob/main/.github/workflows/main.yml).
+Absolutely! If you don't want to publish your package, just delete the `docs/` directory and the `release` job in [`.github/workflows/main.yml`](https://github.com/arnavdas88/nats-observatory/blob/main/.github/workflows/main.yml).
 
 ## Contributing
 
-If you find a bug :bug:, please open a [bug report](https://github.com/allenai/python-package-template/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
-If you have an idea for an improvement or new feature :rocket:, please open a [feature request](https://github.com/allenai/python-package-template/issues/new?assignees=&labels=Feature+request&template=feature_request.md&title=).
+If you find a bug :bug:, please open a [bug report](https://github.com/arnavdas88/nats-observatory/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
+If you have an idea for an improvement or new feature :rocket:, please open a [feature request](https://github.com/arnavdas88/nats-observatory/issues/new?assignees=&labels=Feature+request&template=feature_request.md&title=).
