@@ -1,10 +1,12 @@
 import socket
 import logging
 import asyncio, ssl
+from urllib.parse import urlunparse
 from typing import List, Optional, Union, Awaitable, Callable
 
 from nats.aio import client
 from nats.aio.msg import Msg
+
 from nats.aio.client import ( 
     DEFAULT_CONNECT_TIMEOUT,
     DEFAULT_RECONNECT_TIME_WAIT,
@@ -121,14 +123,48 @@ class Client(client.Client):
             flush_timeout = flush_timeout,
         )
 
-    def _make_event_cb(self, span_name: str, _cb: Optional[ErrorCallback | Callback] = None):
-        async def cb(*args, **kwargs):
-            with self.tracer.start_as_current_span(span_name) as span:
-                span.set_attribute("host", socket.gethostname())
-                for k, v in kwargs.items():
-                    span.set_attribute(f"nats.{k}", str(v))
+    def _make_event_cb(self, cb_name: str, _cb: Optional[ErrorCallback | Callback] = None):
+        async def cb(*args, **kwargs):            
+            # Add a Trace
+            with self.tracer.start_as_current_span(cb_name) as span:
+                span_attributes = {}
+                span_attributes["host"] = socket.gethostname()
+                span_attributes.update(self._server_info)
+
+                # Log the event
+                logger = logging.getLogger(self.config.service_name)
+
+                logger.warn(
+                    f"{cb_name.capitalize()}",
+                    extra = span_attributes
+                )
+
+                # Set span attributes
+                span.set_attributes(span_attributes)
+
                 if _cb:
                     await _cb(*args, **kwargs)
+
+                    callback_attributes = {
+                        "callback.module": cb.__module__,
+                        "callback.repr": str(cb.__repr__()),
+                        "callback.name": cb.__code__.co_name,
+                        "callback.names": list(cb.__code__.co_names),
+                        "callback.qualname": cb.__code__.co_qualname,
+                        "callback.filename": cb.__code__.co_filename,
+                    }
+
+                    # Create an event for triggered callback
+                    span.add_event(
+                        "callback",
+                        attributes={
+                            **span_attributes,
+                            # Callback
+                            **callback_attributes
+                        }
+                    )
+
+
         return cb
 
     async def publish(self, subject: str, data: bytes, headers: dict = None, context: Optional[Context] = None):
@@ -141,33 +177,31 @@ class Client(client.Client):
             headers["NATS-Trace-Only"] = self.config.trace_only
 
         with self.tracer.start_as_current_span(f"nats.publish({subject})", context=context) as span:
-            logger = logging.getLogger(self.config.service_name)
+            # Log the event
+            span_attributes = {}
+            span_attributes.update(self._server_info)
+            span_attributes["host"] = socket.gethostname()
+            span_attributes["nats.subject"] = subject
+            span_attributes["nats.msgsize"] = len(data)
+            span_attributes["nats.payload"] = data.decode()
 
+            logger = logging.getLogger(self.config.service_name)
             logger.info(
                 f"Publishing {len(data)} bytes of data in `{subject}`", 
-                extra={
-                    "nats.subject": subject,
-                    "nats.msgsize": len(data),
-                    "nats.payload": data.decode(),
-                    "nats.host": socket.gethostname(),
-                }
+                extra=span_attributes
             )
 
-            span.set_attribute("nats.subject", subject)
-            span.set_attribute("nats.msgsize", len(data))
-            span.set_attribute("nats.host", socket.gethostname())
+            # Set span attributes
+            span.set_attributes(span_attributes)
 
-            # # Commented out because we dont know if,
-            # # it is successfully publishing or not.
-            # span.add_event(
-            #     "published",
-            #     attributes={
-            #         "nats.subject": subject,
-            #         "nats.msgsize": len(data),
-            #         "nats.payload": data.decode(),
-            #         "nats.host": socket.gethostname(),
-            #     }
-            # )
+            # Create an event for Msg sent
+            span.add_event(
+                "sent",
+                attributes={
+                    "nats.subject": subject,
+                    "nats.payload": data.decode(),
+                }
+            )
 
             # Inject current context into headers
             PROPAGATOR.inject(headers)
@@ -179,24 +213,37 @@ class Client(client.Client):
             # Extract tracing context from headers
             ctx = PROPAGATOR.extract(msg.header or {})
 
-            with self.tracer.start_as_current_span(
-                f"nats.subscribe({subject})", context=ctx
-            ) as span:
+            with self.tracer.start_as_current_span(f"nats.subscribe({subject})", context=ctx ) as span:
+                span_attributes = {}
+                span_attributes["host"] = socket.gethostname()
+                span_attributes.update(self._server_info)
+                span_attributes["nats.subject"] = subject
+                span_attributes["nats.payload"] = msg.data.decode()
+
+                callback_attributes = {
+                    "callback.module": cb.__module__,
+                    "callback.repr": str(cb.__repr__()),
+                    "callback.name": cb.__code__.co_name,
+                    "callback.names": list(cb.__code__.co_names),
+                    "callback.qualname": cb.__code__.co_qualname,
+                    "callback.filename": cb.__code__.co_filename,
+                }
+
+                # Log the event
+                logger = logging.getLogger(self.config.service_name)
+
+                logger.info(
+                    f"Received {len(msg.data)} bytes of data in `{subject}`", 
+                    extra=span_attributes
+                )
 
                 # Set span attributes
-                span.set_attribute("nats.subject", subject)
-                span.set_attribute("nats.msgsize", len(msg.data))
-                span.set_attribute("nats.host", socket.gethostname())
+                span.set_attributes(span_attributes)
 
                 # Create an event for Msg received
                 span.add_event(
                     "received",
-                    attributes={
-                        "nats.subject": subject,
-                        "nats.msgsize": len(msg.data),
-                        "nats.payload": msg.data.decode(),
-                        "nats.host": socket.gethostname(),
-                    }
+                    attributes=span_attributes
                 )
 
                 # Trigger the callback
@@ -206,12 +253,9 @@ class Client(client.Client):
                 span.add_event(
                     "callback",
                     attributes={
-                        "nats.callback.module": cb.__module__,
-                        "nats.callback.repr": str(cb.__repr__()),
-                        "nats.callback.name": cb.__code__.co_name,
-                        "nats.callback.names": list(cb.__code__.co_names),
-                        "nats.callback.qualname": cb.__code__.co_qualname,
-                        "nats.callback.filename": cb.__code__.co_filename,
+                        **span_attributes,
+                        # Callback
+                        **callback_attributes
                     }
                 )
 
