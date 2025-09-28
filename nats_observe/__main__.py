@@ -14,7 +14,7 @@ async def run():
     logger = setup_logging(cfg)
     client = NATSotel(cfg, tracer, logger)
 
-    await client.connect()
+    await client.connect(cfg.servers)
 
     # Default tracing subscription
     await client.raw_subscribe(
