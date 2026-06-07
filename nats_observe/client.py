@@ -32,19 +32,40 @@ from nats.aio.client import (
 )
 
 from opentelemetry.trace import Tracer, use_span, Context, set_span_in_context, get_current_span
-from opentelemetry import _logs as logs
-from opentelemetry._logs import LogRecord
+from opentelemetry.trace import SpanKind
+from opentelemetry import metrics
 
-from .tracing import setup_tracer
+from .tracing import setup_trace_provider
 from .logging import setup_logging
 from .config import NATSotelSettings, PROPAGATOR
 
 
+meter = metrics.get_meter(__name__)
+
+message_sent_counter = meter.create_counter(
+    name="nats.server.message_sent_count",
+    description="Number of NATS messages sent",
+    unit="1",
+)
+
+message_received_counter = meter.create_counter(
+    name="nats.server.message_received_count",
+    description="Number of NATS messages received",
+    unit="1",
+)
+
+message_duration = meter.create_histogram(
+    name="nats.server.duration",
+    description="NATS message duration",
+    unit="ms",
+)
+
 class Client(client.Client):
-    def __init__(self, config: NATSotelSettings = None, tracer: Optional[Tracer] = None, log_handler = None ):
+    def __init__(self, config: NATSotelSettings = None, tracer: Optional[Tracer] = None, log_handler = None, kind = SpanKind.INTERNAL):
         self.config = config if config else NATSotelSettings()
-        self.tracer = tracer if tracer else setup_tracer(self.config)
+        self.tracer = tracer if tracer else setup_trace_provider(self.config)
         self.log_handler = log_handler if log_handler else setup_logging(self.config)
+        self.kind = kind
 
         for logger_name in ["natsotel", self.config.service_name]:
             logging.getLogger(logger_name).addHandler(self.log_handler)
@@ -126,7 +147,7 @@ class Client(client.Client):
     def _make_event_cb(self, cb_name: str, _cb: Optional[ErrorCallback | Callback] = None):
         async def cb(*args, **kwargs):            
             # Add a Trace
-            with self.tracer.start_as_current_span(cb_name) as span:
+            with self.tracer.start_as_current_span(cb_name, kind=self.kind) as span:
                 span_attributes = {}
                 span_attributes["host"] = socket.gethostname()
                 span_attributes.update(self._server_info)
@@ -176,7 +197,7 @@ class Client(client.Client):
         if self.config.trace_only:
             headers["NATS-Trace-Only"] = self.config.trace_only
 
-        with self.tracer.start_as_current_span(f"nats.publish({subject})", context=context) as span:
+        with self.tracer.start_as_current_span(f"nats.publish({subject})", context=context, kind=self.kind) as span:
             # Log the event
             span_attributes = {}
             span_attributes.update(self._server_info)
@@ -205,6 +226,7 @@ class Client(client.Client):
 
             # Inject current context into headers
             PROPAGATOR.inject(headers)
+            message_sent_counter.add(1, {"nats.subject": subject})
 
             await super().publish(subject, data, headers=headers)
 
@@ -213,7 +235,7 @@ class Client(client.Client):
             # Extract tracing context from headers
             ctx = PROPAGATOR.extract(msg.header or {})
 
-            with self.tracer.start_as_current_span(f"nats.subscribe({subject})", context=ctx ) as span:
+            with self.tracer.start_as_current_span(f"nats.subscribe({subject})", context=ctx, kind=self.kind) as span:
                 span_attributes = {}
                 span_attributes["host"] = socket.gethostname()
                 span_attributes.update(self._server_info)
@@ -245,6 +267,8 @@ class Client(client.Client):
                     "received",
                     attributes=span_attributes
                 )
+
+                message_received_counter.add(1, {"nats.subject": subject})
 
                 # Trigger the callback
                 await cb(msg)

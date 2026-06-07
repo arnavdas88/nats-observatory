@@ -3,7 +3,8 @@ import logging
 
 from nats.aio.msg import Msg
 
-from nats_observe.tracing import setup_tracer
+from opentelemetry.trace import SpanKind
+
 from nats_observe.config import NATSotelSettings, NATSConfig
 from nats_observe.client import Client as NATSotel
 from nats_observe.handlers import default_trace_handler
@@ -19,7 +20,7 @@ async def callack_C(msg: Msg):
 async def run():
     settings = NATSotelSettings(service_name='server', servers=["nats://127.0.0.1:4221"])
 
-    client = NATSotel(settings)
+    client = NATSotel(settings, kind=SpanKind.SERVER)
     logger = logging.getLogger('server')
 
     await client.connect()

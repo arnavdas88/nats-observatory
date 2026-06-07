@@ -9,12 +9,11 @@ from opentelemetry.exporter.zipkin.json import ZipkinExporter
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter, ChannelCredentials
 
 from opentelemetry import _logs as logs
-from opentelemetry.sdk._logs import Logger, LoggerProvider, LogRecord
 from opentelemetry.sdk._logs.export import SimpleLogRecordProcessor, ConsoleLogExporter
 
 from .config import NATSotelSettings
 
-def setup_tracer(config: NATSotelSettings, instrumenting_module_name: Optional[str] = None):
+def setup_trace_provider(config: NATSotelSettings, instrumenting_module_name: Optional[str] = None):
     # Define resource attributes for your service
     resource = Resource.create(attributes={SERVICE_NAME: config.service_name})
 

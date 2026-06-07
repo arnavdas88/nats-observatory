@@ -9,12 +9,12 @@ PROPAGATOR: Any = TraceContextTextMapPropagator()
 class OTLPTraceConfig(BaseModel):
     otlp_trace_endpoint: Optional[str] = "localhost:5081"
     otlp_trace_insecure: bool = True
-    otlp_trace_header: Optional[Mapping[str, str]] = None
+    otlp_trace_header: Optional[Mapping[str, str]] = {}
 
 class OTLPLogsConfig(BaseModel):
     otlp_logs_endpoint: Optional[str] = "localhost:5081"
     otlp_logs_insecure: bool = True
-    otlp_logs_header: Optional[Mapping[str, str]] = None
+    otlp_logs_header: Optional[Mapping[str, str]] = {}
 
 class ZipkinExporterConfig(BaseModel):
     zipkin_endpoint: Optional[str] = "http://localhost:9411/api/v2/spans"

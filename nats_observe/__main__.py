@@ -1,6 +1,6 @@
 import asyncio
 
-from nats_observe.tracing import setup_tracer
+from nats_observe.tracing import setup_trace_provider
 from nats_observe.logging import setup_logging
 from nats_observe.config import NATSotelSettings
 from nats_observe.client import Client as NATSotel
@@ -10,7 +10,7 @@ async def run():
     cfg = NATSotelSettings()
     cfg.otlp_trace_header["stream-name"] = "natsotel"
     cfg.otlp_logs_header["stream-name"] = "natsotel"
-    tracer = setup_tracer(cfg)
+    tracer = setup_trace_provider(cfg)
     logger = setup_logging(cfg)
     client = NATSotel(cfg, tracer, logger)
 
